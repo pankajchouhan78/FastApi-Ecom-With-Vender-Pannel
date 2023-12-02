@@ -1,9 +1,10 @@
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, UploadFile, Depends, File
 from admin.pydantic_schemas import UserCreate, UserSign, Token, UserUpdate, UserDelete
 from admin.pydantic_schemas import CategorySchema, CategoryUpdateSchema, CategoryDeleteSchema
 from admin.pydantic_schemas import SubCategorySchema, SubCategoryUpdateSchema, SubCategoryDeleteSchema
+from admin.pydantic_schemas import ProductSchema, ProductUpdateSchema, ProductDeleteSchema
 from passlib.context import CryptContext
-from admin.models import User, Category, SubCategory, Photo
+from admin.models import User, Category, SubCategory, Photo, Product
 from fastapi_login import LoginManager
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
@@ -142,24 +143,7 @@ async def delete_subcategory(data:SubCategoryDeleteSchema):
           return JSONResponse({"status":True, "message": "Subcategory Successfully Deleted"}, status_code=200)
      else:
           return JSONResponse({"status":False, "message":"Invalid Subcategory ID"}, status_code=403)
-     
-async def upload_image(image):
-     path = "/static/images/product/"
-     if not os.path.exists(path):
-            os.makedirs(path)
-     image_name=image.split('.')[0]
-     extension=image.split('.')[1]
 
-     dt = datetime.now()
-     dt_timestamp = round(datetime.timestamp(dt))
-
-     modified_image_name = image_name + "_" + str(dt_timestamp) + "." + extension
-     full_path = path + modified_image_name
-     file_content = await image.read()
-     with open(full_path, 'wb') as file:
-          file.write(file_content)
-          file.close()
-     return full_path
 @router.post('/product_images/')
 async def upload_product_image(file:UploadFile):
      FILEPATH = "static/product/"
@@ -184,3 +168,83 @@ async def upload_product_image(file:UploadFile):
                
           await Photo.create(product_image=generated_name)
           return JSONResponse({"status":True, "message":"Photo Added Successfully"}, status_code=200)
+
+
+async def upload_image(img):
+    FILEPATH = "static/product/"
+    if not os.path.isdir(FILEPATH):
+        os.mkdir(FILEPATH)
+
+    filename = img.filename
+    image_name = filename.split('.')[0]
+    extention = filename.split('.')[1]
+    if extention not in ['jpg','png', "jpeg"]:
+        return {"status":False, "message":"Image Extension Not Allowed"}
+                
+    dt = datetime.now()
+    dt_timestamp = round(datetime.timestamp(dt))
+
+    modified_image_name = image_name + "_" + str(dt_timestamp) + "." + extention
+    generated_name = FILEPATH + modified_image_name
+    file_content = await img.read()
+
+    with open(generated_name, "wb") as file:
+        file.write(file_content)
+        file.close()
+    return generated_name
+@router.post('/product/')
+async def create_product(data:ProductSchema=Depends(),
+                        file:UploadFile = File(...)):
+     if await Category.exists(id=data.category_id):
+            category_obj = await Category.get(id=data.category_id)
+     else:
+            return JSONResponse({"status":False, "message":"Invalid Category ID"}, status_code=403)
+     
+     if await SubCategory.exists(id=data.subcategory_id):
+            subcategory_obj = await SubCategory.get(id=data.subcategory_id)
+     else:
+            return JSONResponse({"status":False, "message":"Invalid Sub-Category ID"}, status_code=403)
+
+     if await Product.exists(name=data.name):
+            return JSONResponse({"status":False, "message":"This product already exists!"}, status_code=403)
+     else:
+            image_url = await upload_image(file)
+
+            await Product.create(
+                 name=data.name,
+                 description=data.description,
+                 price=data.price,
+                 discount_price=data.discount_price,
+                 category=category_obj,
+                 subcategory=subcategory_obj,
+                 product_iamge=image_url
+            )
+            return JSONResponse({"status":True, "message":"Product Added Successfully"}, status_code=200)
+
+@router.get('/product/')
+async def get_product():
+     return await Product.all()
+
+@router.put('/product/')
+async def update_product(data:ProductUpdateSchema=Depends(),
+                         productfile:UploadFile = File(...)):
+     if await Product.exists(id=data.product_id):
+            image_url = await upload_image(productfile)
+
+            await Product.filter(id=data.product_id).update(
+                 name=data.name,
+                 description=data.description,
+                 price=data.price,
+                 discount_price=data.discount_price,
+                 product_iamge=image_url
+            )
+            return JSONResponse({"status":True, "message":"Product Update Successfully"}, status_code=200)
+     else:
+          return JSONResponse({"status":False, "message":"Invalid Product ID"}, status_code=403)
+@router.delete('/product/')
+async def delete_product(data:ProductDeleteSchema):
+     if await Product.exists(id=data.product_id):
+          await Product.filter(id=data.product_id).delete()
+          return JSONResponse({"status":True, "message": "Product Successfully Deleted"}, status_code=200)
+     else:
+          return JSONResponse({"status":False, "message":"Invalid Product ID"}, status_code=403)

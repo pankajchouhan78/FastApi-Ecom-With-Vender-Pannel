@@ -34,3 +34,15 @@ class SubCategory(Model):
 
 class Photo(Model):
     product_image = fields.TextField()
+
+class Product(Model):
+    id=fields.IntField(pk=True)
+    name=fields.CharField(100)
+    price=fields.FloatField()
+    discount_price=fields.IntField()
+    description=fields.TextField()
+    category=fields.ForeignKeyField("models.Category", related_name="product", on_delete="CASCADE")
+    subcategory=fields.ForeignKeyField("models.SubCategory", related_name="products", on_delete="CASCADE")
+    product_iamge=fields.TextField()
+    is_active=fields.BooleanField(default=True)
+

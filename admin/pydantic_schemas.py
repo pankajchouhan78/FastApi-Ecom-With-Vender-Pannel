@@ -34,3 +34,20 @@ class SubCategoryUpdateSchema(BaseModel):
     subcategory_name:str
 class SubCategoryDeleteSchema(BaseModel):
     subcategory_id:int
+
+class ProductSchema(BaseModel):
+    category_id:int
+    subcategory_id:int
+    name:str
+    description:str
+    price:int
+    discount_price:int
+
+class ProductUpdateSchema(BaseModel):
+    product_id:int
+    name:str
+    description:str
+    price:int
+    discount_price:int
+class ProductDeleteSchema(BaseModel):
+    product_id:int
