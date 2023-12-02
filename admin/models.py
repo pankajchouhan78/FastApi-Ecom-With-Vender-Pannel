@@ -31,3 +31,6 @@ class SubCategory(Model):
     is_active = fields.BooleanField(default=True)
     updated_at = fields.DatetimeField(auto_now=True)
     created_at = fields.DatetimeField(auto_now_add=True)
+
+class Photo(Model):
+    product_image = fields.TextField()

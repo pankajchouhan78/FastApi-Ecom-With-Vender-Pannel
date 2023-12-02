@@ -1,13 +1,16 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, UploadFile
 from admin.pydantic_schemas import UserCreate, UserSign, Token, UserUpdate, UserDelete
 from admin.pydantic_schemas import CategorySchema, CategoryUpdateSchema, CategoryDeleteSchema
 from admin.pydantic_schemas import SubCategorySchema, SubCategoryUpdateSchema, SubCategoryDeleteSchema
 from passlib.context import CryptContext
-from admin.models import User, Category, SubCategory
+from admin.models import User, Category, SubCategory, Photo
 from fastapi_login import LoginManager
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-
+import os
+from datetime import datetime
+import secrets
+from PIL import Image
 
 router=APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -140,3 +143,44 @@ async def delete_subcategory(data:SubCategoryDeleteSchema):
      else:
           return JSONResponse({"status":False, "message":"Invalid Subcategory ID"}, status_code=403)
      
+async def upload_image(image):
+     path = "/static/images/product/"
+     if not os.path.exists(path):
+            os.makedirs(path)
+     image_name=image.split('.')[0]
+     extension=image.split('.')[1]
+
+     dt = datetime.now()
+     dt_timestamp = round(datetime.timestamp(dt))
+
+     modified_image_name = image_name + "_" + str(dt_timestamp) + "." + extension
+     full_path = path + modified_image_name
+     file_content = await image.read()
+     with open(full_path, 'wb') as file:
+          file.write(file_content)
+          file.close()
+     return full_path
+@router.post('/product_images/')
+async def upload_product_image(file:UploadFile):
+     FILEPATH = "static/product/"
+     file_name = file.filename
+     extention = file_name.split('.')[1]
+
+     if extention not in ['png', 'jpg']:
+          return JSONResponse({"status":False, "message":"Invalid Filetype"}, status_code=403)
+     else:
+          if not os.path.exists(FILEPATH):
+                os.makedirs(FILEPATH)
+        
+          token_name = secrets.token_hex(10) + "." + extention
+          generated_name = FILEPATH + token_name
+          file_content = await file.read()
+
+          with open(generated_name , 'wb') as file:
+               file.write(file_content)
+
+          img = Image.open(generated_name)
+          img = img.resize(size = (500,500))
+               
+          await Photo.create(product_image=generated_name)
+          return JSONResponse({"status":True, "message":"Photo Added Successfully"}, status_code=200)
